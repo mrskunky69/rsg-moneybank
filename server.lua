@@ -5,12 +5,14 @@ RSGCore.Functions.CreateUseableItem(Config.MoneyBoxItem, function(source, item)
     local firstname = Player.PlayerData.charinfo.firstname
     local lastname = Player.PlayerData.charinfo.lastname
 
-    if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+    if Player.Functions.RemoveItem(item.name, 0, item.slot) then
         local playerPed = GetPlayerPed(source)
         local coords = GetEntityCoords(playerPed)
-
-        TriggerClientEvent("rsg_moneybox:client:useMoneyBox", source, coords)
-        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Creating money box', 'green', firstname .. ' ' .. lastname .. ' has created a money box.')
+        
+        -- Initialize the money box with 0 amount when created
+        local moneyAmount = 0
+        TriggerClientEvent("rsg_moneybox:client:useMoneyBox", source, coords, moneyAmount)
+        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Creating money box', 'green', firstname .. ' ' .. lastname .. ' has created a money box with $' .. moneyAmount)
     else
         TriggerClientEvent('RSGCore:Notify', source, "You don't have a money box", 'error')
     end
@@ -27,6 +29,10 @@ AddEventHandler('rsg_moneybox:addMoneyToBox', function(data)
         moneyBox.cashAmount = moneyBox.cashAmount + moneyAmount
         TriggerClientEvent('rsg_moneybox:updateMoneyBoxCash', -1, moneyBox.netId, moneyBox.cashAmount)
         TriggerClientEvent('RSGCore:Notify', src, "You added $" .. moneyAmount .. " to the money box", 'success')
+        
+        local firstname = Player.PlayerData.charinfo.firstname
+        local lastname = Player.PlayerData.charinfo.lastname
+        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Adding money to money box', 'green', firstname .. ' ' .. lastname .. ' added $' .. moneyAmount .. ' to the money box')
     else
         TriggerClientEvent('RSGCore:Notify', src, "You don't have enough cash", 'error')
     end
@@ -43,7 +49,9 @@ AddEventHandler('rsg_moneybox:pickupMoneyBox', function(moneyBox)
     -- Notify the player of the cash received from the money box
     TriggerClientEvent('rsg_moneybox:notifyPickup', src, moneyBox.cashAmount)
 
-    
+    local firstname = Player.PlayerData.charinfo.firstname
+    local lastname = Player.PlayerData.charinfo.lastname
+    TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Picking up money box', 'green', firstname .. ' ' .. lastname .. ' picked up a money box with $' .. moneyBox.cashAmount)
 end)
 
 RegisterNetEvent('rsg_moneybox:removeMoneyBoxFromInventory')
@@ -56,4 +64,8 @@ AddEventHandler('rsg_moneybox:removeMoneyBoxFromInventory', function(cashAmount)
     Player.Functions.AddMoney('cash', cashAmount)
 
     TriggerClientEvent('RSGCore:Notify', src, "You received $" .. cashAmount .. " from the money box.", 'success')
+
+    local firstname = Player.PlayerData.charinfo.firstname
+    local lastname = Player.PlayerData.charinfo.lastname
+    TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Removing money box from inventory', 'green', firstname .. ' ' .. lastname .. ' removed a money box from inventory with $' .. cashAmount)
 end)
