@@ -5,67 +5,112 @@ RSGCore.Functions.CreateUseableItem(Config.MoneyBoxItem, function(source, item)
     local firstname = Player.PlayerData.charinfo.firstname
     local lastname = Player.PlayerData.charinfo.lastname
 
-    if Player.Functions.RemoveItem(item.name, 0, item.slot) then
+    if Player.Functions.RemoveItem(item.name, 1, item.slot) then
         local playerPed = GetPlayerPed(source)
         local coords = GetEntityCoords(playerPed)
-        
-        -- Initialize the money box with 0 amount when created
-        local moneyAmount = 0
-        TriggerClientEvent("rsg_moneybox:client:useMoneyBox", source, coords, moneyAmount)
-        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Creating money box', 'green', firstname .. ' ' .. lastname .. ' has created a money box with $' .. moneyAmount)
+        TriggerClientEvent("rsg_moneybox:client:useMoneyBox", source, coords)
+        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Creating money box', 'green', firstname .. ' ' .. lastname .. ' has created a money box.')
     else
         TriggerClientEvent('RSGCore:Notify', source, "You don't have a money box", 'error')
     end
 end)
 
-RegisterNetEvent('rsg_moneybox:addMoneyToBox')
-AddEventHandler('rsg_moneybox:addMoneyToBox', function(data)
+RegisterNetEvent('rsg_moneybox:createMoneyBox')
+AddEventHandler('rsg_moneybox:createMoneyBox', function(coords, cashAmount)
     local src = source
     local Player = RSGCore.Functions.GetPlayer(src)
-    local moneyAmount = data.amount
-    local moneyBox = data.moneyBox
 
-    if Player.Functions.RemoveMoney('cash', moneyAmount) then
-        moneyBox.cashAmount = moneyBox.cashAmount + moneyAmount
-        TriggerClientEvent('rsg_moneybox:updateMoneyBoxCash', -1, moneyBox.netId, moneyBox.cashAmount)
-        TriggerClientEvent('RSGCore:Notify', src, "You added $" .. moneyAmount .. " to the money box", 'success')
-        
-        local firstname = Player.PlayerData.charinfo.firstname
-        local lastname = Player.PlayerData.charinfo.lastname
-        TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Adding money to money box', 'green', firstname .. ' ' .. lastname .. ' added $' .. moneyAmount .. ' to the money box')
+    if Player.Functions.RemoveMoney('cash', cashAmount) then
+        local moneyBox = {
+            netId = nil,
+            cashAmount = cashAmount,
+            coords = coords
+        }
+        MySQL.Async.execute('INSERT INTO money_boxes (cashAmount, x, y, z) VALUES (@cashAmount, @x, @y, @z)', {
+            ['@cashAmount'] = moneyBox.cashAmount,
+            ['@x'] = moneyBox.coords.x,
+            ['@y'] = moneyBox.coords.y,
+            ['@z'] = moneyBox.coords.z
+        }, function(affectedRows)
+            if affectedRows > 0 then
+                TriggerClientEvent('rsg_moneybox:createMoneyBoxClient', src, coords, moneyBox)
+            else
+                print("Error inserting money box into database")
+            end
+        end)
     else
         TriggerClientEvent('RSGCore:Notify', src, "You don't have enough cash", 'error')
     end
 end)
 
-RegisterNetEvent('rsg_moneybox:pickupMoneyBox')
-AddEventHandler('rsg_moneybox:pickupMoneyBox', function(moneyBox)
-    local src = source
-    local Player = RSGCore.Functions.GetPlayer(src)
-
-    -- Pay the cash amount directly to the player
-    Player.Functions.AddMoney('cash', moneyBox.cashAmount)
-
-    -- Notify the player of the cash received from the money box
-    TriggerClientEvent('rsg_moneybox:notifyPickup', src, moneyBox.cashAmount)
-
-    local firstname = Player.PlayerData.charinfo.firstname
-    local lastname = Player.PlayerData.charinfo.lastname
-    TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Picking up money box', 'green', firstname .. ' ' .. lastname .. ' picked up a money box with $' .. moneyBox.cashAmount)
+RegisterNetEvent('rsg_moneybox:updateMoneyBoxNetId')
+AddEventHandler('rsg_moneybox:updateMoneyBoxNetId', function(moneyBox)
+    MySQL.Async.execute('UPDATE money_boxes SET netId = @netId WHERE x = @x AND y = @y AND z = @z', {
+        ['@netId'] = moneyBox.netId,
+        ['@x'] = moneyBox.coords.x,
+        ['@y'] = moneyBox.coords.y,
+        ['@z'] = moneyBox.coords.z
+    }, function(affectedRows)
+        if affectedRows == 0 then
+            print("Error updating money box netId in database")
+        end
+    end)
 end)
 
-RegisterNetEvent('rsg_moneybox:removeMoneyBoxFromInventory')
-AddEventHandler('rsg_moneybox:removeMoneyBoxFromInventory', function(cashAmount)
+RegisterNetEvent('rsg_moneybox:openMoneyBox')
+AddEventHandler('rsg_moneybox:openMoneyBox', function(netId)
     local src = source
     local Player = RSGCore.Functions.GetPlayer(src)
 
-    -- Remove the money box item from the player's inventory
-    Player.Functions.RemoveItem(Config.MoneyBoxItem, 1)
-    Player.Functions.AddMoney('cash', cashAmount)
+    MySQL.Async.fetchAll('SELECT * FROM money_boxes WHERE netId = @netId', { ['@netId'] = netId }, function(results)
+        if results[1] then
+            local cashAmount = results[1].cashAmount
+            Player.Functions.AddMoney('cash', cashAmount)
+            MySQL.Async.execute('DELETE FROM money_boxes WHERE netId = @netId', { ['@netId'] = netId }, function(affectedRows)
+                if affectedRows > 0 then
+                    TriggerClientEvent('rsg_moneybox:removeMoneyBox', -1, netId)
+                    TriggerClientEvent('rsg_moneybox:notifyMoneyBoxOpened', src, cashAmount)
+                else
+                    TriggerClientEvent('RSGCore:Notify', src, "Failed to remove money box from database", 'error')
+                end
+            end)
+        else
+            TriggerClientEvent('RSGCore:Notify', src, "Money box not found", 'error')
+        end
+    end)
+end)
 
-    TriggerClientEvent('RSGCore:Notify', src, "You received $" .. cashAmount .. " from the money box.", 'success')
+RegisterNetEvent('rsg_moneybox:pickupMoneyBox')
+AddEventHandler('rsg_moneybox:pickupMoneyBox', function(netId)
+    local src = source
+    local Player = RSGCore.Functions.GetPlayer(src)
 
-    local firstname = Player.PlayerData.charinfo.firstname
-    local lastname = Player.PlayerData.charinfo.lastname
-    TriggerEvent('rsg-log:server:CreateLog', 'money_box', 'Removing money box from inventory', 'green', firstname .. ' ' .. lastname .. ' removed a money box from inventory with $' .. cashAmount)
+    MySQL.Async.fetchAll('SELECT * FROM money_boxes WHERE netId = @netId', { ['@netId'] = netId }, function(results)
+        if results[1] then
+            local cashAmount = results[1].cashAmount
+            Player.Functions.AddItem('moneybox', 1)
+            Player.Functions.AddMoney('cash', cashAmount)
+            MySQL.Async.execute('DELETE FROM money_boxes WHERE netId = @netId', { ['@netId'] = netId }, function(affectedRows)
+                if affectedRows > 0 then
+                    TriggerClientEvent('rsg_moneybox:removeMoneyBox', -1, netId)
+                    TriggerClientEvent('rsg_moneybox:notifyMoneyBoxPickedUp', src, cashAmount)
+                else
+                    TriggerClientEvent('RSGCore:Notify', src, "Failed to remove money box from database", 'error')
+                end
+            end)
+        else
+            TriggerClientEvent('RSGCore:Notify', src, "Money box not found", 'error')
+        end
+    end)
+end)
+
+
+
+
+AddEventHandler('onResourceStart', function(resourceName)
+    if GetCurrentResourceName() == resourceName then
+        MySQL.Async.fetchAll('SELECT * FROM money_boxes', {}, function(moneyBoxes)
+            TriggerClientEvent('rsg_moneybox:loadMoneyBoxes', -1, moneyBoxes)
+        end)
+    end
 end)
