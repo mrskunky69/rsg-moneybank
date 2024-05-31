@@ -1,25 +1,8 @@
--- --------------------------------------------------------
--- Host:                         127.0.0.1
--- Server version:               10.4.32-MariaDB - mariadb.org binary distribution
--- Server OS:                    Win64
--- HeidiSQL Version:             12.6.0.6765
--- --------------------------------------------------------
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8 */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 
--- Dumping database structure for rexshackredmbuild_c50ff1
-CREATE DATABASE IF NOT EXISTS `rexshackredmbuild_c50ff1` /*!40100 DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci */;
-USE `rexshackredmbuild_c50ff1`;
 
--- Dumping structure for table rexshackredmbuild_c50ff1.money_boxes
+
+
 CREATE TABLE IF NOT EXISTS `money_boxes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `netId` int(11) NOT NULL,
@@ -30,7 +13,6 @@ CREATE TABLE IF NOT EXISTS `money_boxes` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
--- Dumping data for table rexshackredmbuild_c50ff1.money_boxes: ~34 rows (approximately)
 INSERT INTO `money_boxes` (`id`, `netId`, `cashAmount`, `x`, `y`, `z`) VALUES
 	(24, 38, 100, -351.152, 753.969, 116.511),
 	(25, 17, 100, -352.009, 753.389, 116.478),
